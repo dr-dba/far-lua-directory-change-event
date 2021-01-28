@@ -17,6 +17,7 @@ Put the script here:
 
 local sz_own_file, sz_some_load_code = ...
 
+-- Timer poll interval in milliseconds:
 local POLL_INTERVAL = 1000
 local POLL_INT_PNL_CHK = 3000
 local POLL_INT_TMP_CHK = 5000
@@ -106,9 +107,11 @@ local function fnc_evt_dir_chg(evt_data)
 --	LE(evt_data)
 	local was_change = false
 	local chg_str = ""
-	for key, val in pairs(evt_data) do
-		if type(val) == "boolean" and val and string.match(key, "^chg_") then
-			was_change = true
+	for key, val in pairs(evt_data) 
+	do	if	val
+		and	type(val) == "boolean" 
+		and	string.match(key, "^chg_") 
+		then	was_change = true
 			chg_str = chg_str..tostring(key).." = "..tostring(val).."\n"
 		end
 	end
@@ -193,7 +196,7 @@ local function fnc_check_panel_state(force_save)
 	end
 
 	return	chg_any, chg_dir, cmt_res == 0, tbl_evt_data
-end
+end -- of fnc_check_panel_state
 
 local function fnc_prep_for_now()
 	dt_now = Far.UpTime
@@ -223,14 +226,15 @@ then	dt_pnl_chk = dt_now
 end
 
 
-if 	USE_TIMER and
-	tmr_sender and not
-	tmr_sender.Closed
+if	USE_TIMER 
+and	tmr_sender 
+and not tmr_sender.Closed
 then	tmr_sender.Enabled = true
 end
 
 return pnl_evt_dat
 
+-- @@@ fnc_timer_poll
 
 end
 
@@ -320,7 +324,7 @@ GetContentData = function(path_file, col_set)
 	then	fnc_eat_evt(path_file, "C_")
 		last_cont_col_dir_chg = true
 		last_cont_col_dir = path_fold
-
+		
 		pan_cost = panel_costs[path_fold]
 	end
 	if	pan_cost.host_file_dir
@@ -385,6 +389,7 @@ end
 	pan_cost.dt_walk = Far.UpTime
 	return col_dat
 end;
+-- @@@ c0_v2
 	}
 
 if not	Far
