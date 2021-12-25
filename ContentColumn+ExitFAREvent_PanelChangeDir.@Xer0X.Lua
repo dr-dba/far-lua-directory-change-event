@@ -362,6 +362,7 @@ local ContCol_v2 =
 -- ###
 GetContentFields = function(col_set, param2)
 	local new_dir = fnc_eat_evt(nil, "P_")
+	return true
 end;
 
 GetContentData = function(path_file, col_set)
