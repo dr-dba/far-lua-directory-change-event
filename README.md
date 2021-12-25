@@ -1,5 +1,9 @@
 # far-lua-directory-change-event
-<br /><br />
+This script gives saves and restores<br />
+last paths and current items on both<br />
+right and left panels of FAR Manager<br />
+between restarts<br />
+<br />
 based on the code of Gene.Pavlovsky:<br />
 https://forum.farmanager.com/viewtopic.php?t=10521
 <br /><br />
