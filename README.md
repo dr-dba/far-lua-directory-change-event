@@ -3,17 +3,6 @@
 based on the code of Gene.Pavlovsky:<br />
 https://forum.farmanager.com/viewtopic.php?t=10521
 <br /><br />
-Put the script here:<br />
-%FARPROFILE%\Macros\scripts\ContentColumn+ExitFAREvent_PanelChangeDir.@Xer0X.Lua
-<br /><br />
-This script gives saves and restores<br />
-last paths and current items on both<br />
-right and left panels of FAR Manager<br />
-between restarts<br />
-<br />
-based on the code of Gene.Pavlovsky:<br />
-https://forum.farmanager.com/viewtopic.php?t=10521
-<br /><br />
 FarForum discussion page:<br />
 https://forum.farmanager.com/viewtopic.php?t=12437
 <br /><br />
