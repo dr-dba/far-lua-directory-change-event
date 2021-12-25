@@ -51,7 +51,27 @@ local far_SendDlgMessage =	far.SendDlgMessage
 local far_RecursiveSearch =	far.RecursiveSearch
 local far_TruncPathStr	=	far.TruncPathStr
 local far_Timer		=	far.Timer
+
+local panel_GetPanelInfo=	panel.GetPanelInfo
+local panel_RedrawPanel	=	panel.RedrawPanel
+local Panel_SetPosIdx	=	Panel.SetPosIdx
+local Panel_Select	=	Panel.Select
+
 local win_GetFileAttr	=	win.GetFileAttr
+local win_SearchPath	=	win.SearchPath
+local win_SetEnv	=	win.SetEnv
+local win_GetEnv	=	win.GetEnv
+local win_system	=	win.system
+local win_Uuid		=	win.Uuid
+
+local mf_fsplit	= mf.fsplit
+local os_date	= os.date
+local math_min	= math.min
+
+local fnc_str_replace   = Xer0X.fnc_str_replace
+local fnc_set_tmp_dir_var=Xer0X.fnc_set_tmp_dir_var
+local fnc_file_append	= Xer0X.fnc_file_append
+local fnc_trans_msg	= Xer0X.fnc_trans_msg
 
 -- Timer poll interval in milliseconds:
 local POLL_INTERVAL	= 1000
@@ -65,8 +85,8 @@ local REDRAW_SHELL	= false -- to update prompt clock
 local USE_TIMER		= true
 local CONT_COL_DIR_CALC_LIM
 			= 5000
-local SYNC_STORE_LIMIT	= 30000
-local SQL_OUT		= "NUL"
+local SYNC_STORE_LIMIT	= 10000
+local SQL_OUTPUT	= "NUL"
 		--	= "c:\\sqlite.out"
 local API_ACT_PNL = 1
 local API_PAS_PNL = 0
@@ -75,18 +95,18 @@ local MCR_PAS_PNL = 1
 
 
 local CUSTOM_CHANGE_SCRIPT_PATH = sz_own_file..'.Cfg'
-local SQLITE = 'sqlite3.exe'
+local SQLITE_EXE_PATH= 'sqlite3.exe'
 local LOCALCONFIG_DB = '%FARLOCALPROFILE%\\LocalConfig.db'
 
-LOCALCONFIG_DB = LOCALCONFIG_DB:gsub("%%(.-)%%", win.GetEnv)
-SQLITE = SQLITE:gsub("%%(.-)%%", win.GetEnv)
+LOCALCONFIG_DB = LOCALCONFIG_DB :gsub("%%(.-)%%", win_GetEnv)
+SQLITE_EXE_PATH= SQLITE_EXE_PATH:gsub("%%(.-)%%", win_GetEnv)
 
-if not	mf.fexist(SQLITE)
+if not	mf.fexist(SQLITE_EXE_PATH)
 then	local	sqlite_path, 
 		sqlite_name 
-			= win.SearchPath(nil, SQLITE, ".exe")
+			= win.SearchPath(nil, SQLITE_EXE_PATH, ".exe")
 	if	sqlite_path 
-	then	SQLITE = sqlite_path 
+	then	SQLITE_EXE_PATH = sqlite_path 
 	end
 end
 
@@ -141,8 +161,8 @@ COMMIT;]]       ):format(
 			R_Panel.Path0:gsub("'", "''"),
 			(pnl_evt_dat.Curr_ActvLeft and 1 or 0)
 		):gsub("[\r\n\t]+", " ")
-	local sql_cmd = ('""""%s" "%s" "%s" """ >> %s 2>&1'):format(SQLITE, LOCALCONFIG_DB, sqld, SQL_OUT)
-	local exec_res, exec_msg = win.system(sql_cmd)
+	local sql_cmd = ('""""%s" "%s" "%s" """ >> %s 2>&1'):format(SQLITE_EXE_PATH, LOCALCONFIG_DB, sqld, SQL_OUTPUT)
+	local exec_res, exec_msg = win_system(sql_cmd)
 	return exec_res, exec_msg
 end
 
@@ -242,18 +262,18 @@ local function fnc_prep_for_now()
 	dt_now = Far.UpTime
 	dt_now_str =
 	--	mf.date("%Y.%m0.%d %H:%M:%S")
-		os.date("%Y-%m-%d %H:%M:%S")
+		os_date("%Y-%m-%d %H:%M:%S")
 end
 
 
 -- #####
 
 local function fnc_redraw_panel_to_show_time_in_prompt(sender, ActPanCurPos, TopPanelItem)
-	local paninf = panel.GetPanelInfo(nil, 1)
-	local pos_to_set = math.min(ActPanCurPos, paninf.ItemsNumber)
+	local paninf = panel_GetPanelInfo(nil, 1)
+	local pos_to_set = math_min(ActPanCurPos, paninf.ItemsNumber)
 	if	paninf.CurrentItem == pos_to_set
 	then 	sender:Close()
-	else	panel.RedrawPanel(API_ACT_PNL, { CurrentItem = pos_to_set, TopPanelItem = TopPanelItem })
+	else	panel_RedrawPanel(API_ACT_PNL, { CurrentItem = pos_to_set, TopPanelItem = TopPanelItem })
 	end
 end
 
@@ -312,7 +332,7 @@ local function fnc_eat_evt(file_path, who_sent)
 		path_dir	= path_dir :sub(5, -1)
 	elseif	file_path and APanel.Plugin
 	then	is_plugin = true
-		file_plugin_dir = mf.fsplit(file_path, 3):sub(1, -2)
+		file_plugin_dir = mf_fsplit(file_path, 3):sub(1, -2)
 	end
 	local host_file_L_dir = is_plugin and L_Panel.Path0:find(file_plugin_dir, nil, "plain") == 1 and L_Panel.Path0 == file_plugin_dir and file_plugin_dir
 	local host_file_R_dir = is_plugin and R_Panel.Path0:find(file_plugin_dir, nil, "plain") == 1 and R_Panel.Path0 == file_plugin_dir and file_plugin_dir
@@ -345,7 +365,7 @@ GetContentFields = function(col_set, param2)
 end;
 
 GetContentData = function(path_file, col_set)
-	local	col_dat = {}
+	local	col_dat = { }
 	local	new_dir = string_match(path_file, ".?\\$") and true or false
 	local	path_fold = string_sub(string_match(path_file, "^(.+[\\/])"), 1, -2)
 	if	string_sub(path_file, 1, 4) == "\\\\?\\"
@@ -451,7 +471,7 @@ then	tmr_poll = far_Timer(POLL_INTERVAL, fnc_timer_poll, false, false, "T_")
 end
 
 local	FAR_EXIT_MSG_DLG_ID_TXT = "4EBBEFC8-2084-4B7F-94C0-692CE136894D"
-local	FAR_EXIT_MSG_DLG_ID_BIN = win.Uuid(FAR_EXIT_MSG_DLG_ID_TXT)
+local	FAR_EXIT_MSG_DLG_ID_BIN = win_Uuid(FAR_EXIT_MSG_DLG_ID_TXT)
 
 Event { description = "FAR exit detection";
 	group = "DialogEvent";
@@ -460,7 +480,7 @@ Event { description = "FAR exit detection";
 if	evt	== DE_DLGPROCINIT
 and	prm.Msg == DN_INITDIALOG 
 then	local	dlg_info = prm.hDlg:send(DM_GETDIALOGINFO)
-	if	dlg_info and win.Uuid(dlg_info.Id):upper() == FAR_EXIT_MSG_DLG_ID_TXT
+	if	dlg_info and win_Uuid(dlg_info.Id):upper() == FAR_EXIT_MSG_DLG_ID_TXT
 	then
 		fnc_timer_poll(tmr_poll, false, true, "E_")
 	end
