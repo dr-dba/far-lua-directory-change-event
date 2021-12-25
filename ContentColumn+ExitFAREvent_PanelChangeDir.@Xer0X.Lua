@@ -11,11 +11,11 @@
 based on the code of Gene.Pavlovsky:
 https://forum.farmanager.com/viewtopic.php?t=10521
 
-GitHub home:
-https://github.com/dr-dba/far-lua-directory-change-event
-
 FarForum discussion page:
 https://forum.farmanager.com/viewtopic.php?t=12437
+
+GitHub home:
+https://github.com/dr-dba/far-lua-directory-change-event
 
 Put the script here:
 %FARPROFILE%\Macros\scripts\ContentColumn+ExitFAREvent_PanelChangeDir.@Xer0X.Lua
@@ -40,6 +40,18 @@ local DM_GETITEMPOSITION= F.DM_GETITEMPOSITION
 local DN_RESIZECONSOLE	= F.DN_RESIZECONSOLE
 local FRS_RECUR		= F.FRS_RECUR
 local DM_CLOSE		= F.DM_CLOSE
+
+local string_lower	= string.lower
+local string_find	= string.find
+local string_match	= string.match
+local string_sub	= string.sub
+
+local far_GetNumberOfLinks =	far.GetNumberOfLinks
+local far_SendDlgMessage =	far.SendDlgMessage
+local far_RecursiveSearch =	far.RecursiveSearch
+local far_TruncPathStr	=	far.TruncPathStr
+local far_Timer		=	far.Timer
+local win_GetFileAttr	=	win.GetFileAttr
 
 -- Timer poll interval in milliseconds:
 local POLL_INTERVAL	= 1000
@@ -117,31 +129,30 @@ local function fnc_save_panel_state(pnl_evt_dat)
 	local sqld = ([[
 BEGIN TRANSACTION;
 DELETE FROM 'general_config';
-INSERT INTO 'general_config' VALUES('Panel.Left',	'CurFile',	'%s');
-INSERT INTO 'general_config' VALUES('Panel.Left',	'Folder',	'%s');
-INSERT INTO 'general_config' VALUES('Panel.Right',	'CurFile',	'%s');
-INSERT INTO 'general_config' VALUES('Panel.Right',	'Folder',	'%s');
-INSERT INTO 'general_config' VALUES('Panel',		'LeftFocus',	 %s );
-COMMIT;]]
-		):format(
+INSERT INTO 'general_config' VALUES('Panel.Left' , 'CurFile'	, '%s');
+INSERT INTO 'general_config' VALUES('Panel.Left' , 'Folder'	, '%s');
+INSERT INTO 'general_config' VALUES('Panel.Right', 'CurFile'	, '%s');
+INSERT INTO 'general_config' VALUES('Panel.Right', 'Folder'	, '%s');
+INSERT INTO 'general_config' VALUES('Panel'	 , 'LeftFocus'	,  %s );
+COMMIT;]]       ):format(
 			pnl_evt_dat.Curr_LeftItem:gsub("'", "''"),
 			L_Panel.Path0:gsub("'", "''"),
 			pnl_evt_dat.Curr_RghtItem:gsub("'", "''"),
 			R_Panel.Path0:gsub("'", "''"),
 			(pnl_evt_dat.Curr_ActvLeft and 1 or 0)
-				):gsub("[\r\n\t]+", " ")
+		):gsub("[\r\n\t]+", " ")
 	local sql_cmd = ('""""%s" "%s" "%s" """ >> %s 2>&1'):format(SQLITE, LOCALCONFIG_DB, sqld, SQL_OUT)
 	local exec_res, exec_msg = win.system(sql_cmd)
 	return exec_res, exec_msg
 end
 
-local fnc_custom_change_proc
+local fnc_custom_change_proc = nil
 if mf.fexist(CUSTOM_CHANGE_SCRIPT_PATH) 
-then	local cust_fnc = loadfile(CUSTOM_CHANGE_SCRIPT_PATH)
-	if type(cust_fnc) == 'function' 
-	then	cust_fnc = cust_fnc()
-		if type(cust_fnc) == 'function' 
-		then fnc_custom_change_proc = cust_fnc
+then	local cust_func = loadfile(CUSTOM_CHANGE_SCRIPT_PATH)
+	if type(cust_func) == 'function' 
+	then	cust_func = cust_func()
+		if type(cust_func) == 'function' 
+		then fnc_custom_change_proc = cust_func
 		end
 	end
 end
@@ -182,6 +193,18 @@ local function fnc_check_panel_state(force_save)
 	local	chg_item_L = Prev_LeftItem ~= Curr_LeftItem
 	local	chg_item_R = Prev_RghtItem ~= Curr_RghtItem
 
+	local chg_dir =
+		chg_actv_P or
+		chg_path_L or
+		chg_path_R or
+		chg_phsp_L or
+		chg_phsp_R
+
+	local chg_any = 
+		chg_item_L or
+		chg_item_R or
+		chg_dir
+
 	local tbl_evt_data = {
 		chg_actv_P = chg_actv_P, Prev_ActvLeft = Prev_ActvLeft,	Curr_ActvLeft = Curr_ActvLeft,
 		chg_path_L = chg_path_L, Prev_LeftPath = Prev_LeftPath,	Curr_LeftPath = Curr_LeftPath,
@@ -190,23 +213,9 @@ local function fnc_check_panel_state(force_save)
 		chg_phsp_R = chg_phsp_R, Prev_RghtPhsP = Prev_RghtPhsP,	Curr_RghtPhsP = Curr_RghtPhsP,
 		chg_item_L = chg_item_L, Prev_LeftItem = Prev_LeftItem,	Curr_LeftItem = Curr_LeftItem,
 		chg_item_R = chg_item_R, Prev_RghtItem = Prev_RghtItem,	Curr_RghtItem = Curr_RghtItem,
+		chg_dir = chg_dir,
+		chg_any = chg_any,
 	}
-
-	local chg_any =
-		chg_actv_P or
-		chg_path_L or
-		chg_path_R or
-		chg_phsp_L or
-		chg_phsp_R or
-		chg_item_L or
-		chg_item_R
-
-	local chg_dir =
-		chg_actv_P or
-		chg_path_L or
-		chg_path_R or
-		chg_phsp_L or
-		chg_phsp_R
 
 	if chg_any
 	then
@@ -222,8 +231,7 @@ local function fnc_check_panel_state(force_save)
 	if 	force_save 
 	or	uncommitted > 0 
 	and 	dt_now - dt_chg > SYNC_STORE_LIMIT
-	then
-		uncommitted = 0
+	then	uncommitted = 0
 		cmt_res, cmt_msg = fnc_save_panel_state(tbl_evt_data)
 	end
 
@@ -338,21 +346,21 @@ end;
 
 GetContentData = function(path_file, col_set)
 	local	col_dat = {}
-	local	new_dir = string.match(path_file, ".?\\$") and true or false
-	local	path_fold = string.sub(string.match(path_file, "^(.+[\\/])"), 1, -2)
-	if	string.sub(path_file, 1, 4) == "\\\\?\\"
+	local	new_dir = string_match(path_file, ".?\\$") and true or false
+	local	path_fold = string_sub(string_match(path_file, "^(.+[\\/])"), 1, -2)
+	if	string_sub(path_file, 1, 4) == "\\\\?\\"
 	then	
-		path_fold = string.sub(path_fold, 5)
+		path_fold = string_sub(path_fold, 5)
 	end
 	if	path_fold:sub(1, 4) == "UNC\\"
 	then	
 		path_fold = "\\"..path_fold:sub(4)
 	end
 	local is_root, path_root, unc_host
-	unc_host = string.match(path_fold, "^\\\\([^\\]+)")
+	unc_host = string_match(path_fold, "^\\\\([^\\]+)")
 	path_root = unc_host and
-		string.match(path_fold, "^\\\\.-\\[^\\]+[^\\]") or
-		string.match(path_fold, "^[^\\]:") 
+		string_match(path_fold, "^\\\\.-\\[^\\]+[^\\]") or
+		string_match(path_fold, "^[^\\]:") 
 	is_root = path_root == path_fold
 	if	is_root
 	then	path_fold = path_fold.."\\"
@@ -375,32 +383,32 @@ GetContentData = function(path_file, col_set)
 
 	local function fnc_file_item_check(item)
 		found_cnt = found_cnt + 1
-		if not	string.match(item.FileAttributes, "d")
-		then	return true
-		elseif	found_cnt % 25 == 0 and Far.UpTime - dt_calc_start > CONT_COL_DIR_CALC_LIM
-		then 
+		if not	string_match(item.FileAttributes, "d")
+		then	return true, false -- found a file
+		elseif	found_cnt % 10 == 0 and Far.UpTime - dt_calc_start > CONT_COL_DIR_CALC_LIM
+		then    -- timeouted lookinf in the directory
 			return true, true
 		end
 	end
 
-	for ii, val in ipairs(col_set)
-	do	the_col = string.lower(val)
+	for ii, ii_val in ipairs(col_set)
+	do	the_col = string_lower(ii_val)
 		if	too_costy
 		then	col_dat[ii] = "."
 			if not	pan_cost.dt_said_cost
 			then	pan_cost.dt_said_cost = Far.UpTime
 			end
 		else	if	the_col == "i" 
-			then	local	f_attr = win.GetFileAttr(path_file)
+			then	local	f_attr = win_GetFileAttr(path_file)
 				if	f_attr
-				then	local	is_dir = string.find(f_attr, "d") and true or false
-					local 	is_lnk = string.find(f_attr, "e") and true or false
-					local 	is_arc = string.find(f_attr, "a") and true or false
+				then	local	is_dir = string_find(f_attr, "d") and true or false
+					local 	is_lnk = string_find(f_attr, "e") and true or false
+					local 	is_arc = string_find(f_attr, "a") and true or false
 					if	is_dir and not is_lnk
 					then	found_cnt = 0
-						local found_file, got_tmOt = far.RecursiveSearch(path_file, '*.*', fnc_file_item_check, FRS_RECUR)
-						col_dat[ii] = got_tmOt and "." or found_file and "" or found_cnt > 0 and "e" or "E"
-					else 	local link_cnt = far.GetNumberOfLinks(path_file)
+						local found_file, got_tmOt, xyz1 = far_RecursiveSearch(path_file, '*.*', fnc_file_item_check, FRS_RECUR)
+						col_dat[ii] = got_tmOt and "T" or found_file and "" or found_cnt > 0 and "e" or "E"
+					else 	local link_cnt = far_GetNumberOfLinks(path_file)
 						col_dat[ii] = link_cnt > 1 and tostring(link_cnt) or ""
 					end
 					if not	col_dat[ii]
@@ -439,7 +447,7 @@ end
 
 local	tmr_poll
 if	USE_TIMER 
-then	tmr_poll = far.Timer(POLL_INTERVAL, fnc_timer_poll, false, false, "T_")
+then	tmr_poll = far_Timer(POLL_INTERVAL, fnc_timer_poll, false, false, "T_")
 end
 
 local	FAR_EXIT_MSG_DLG_ID_TXT = "4EBBEFC8-2084-4B7F-94C0-692CE136894D"
@@ -480,12 +488,11 @@ Macro { description = "detect panel change";
 	condition = function()
 -- ###
 if not (APanel.Visible or PPanel.Visible) then return end
-far.Timer(5, function(sender) sender.Enabled = false; sender:Close(); fnc_eat_evt(nil, "M_") end)
+far_Timer(5, function(sender) sender.Enabled = false; sender:Close(); fnc_eat_evt(nil, "M_") end)
 return false;
 -- @@@
 	end;
 	action = function()
 	end
 }
-
 -- @@@@@
