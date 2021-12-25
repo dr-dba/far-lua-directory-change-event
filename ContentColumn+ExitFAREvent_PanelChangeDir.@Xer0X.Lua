@@ -17,24 +17,42 @@ Put the script here:
 
 local sz_own_file, sz_some_load_code = ...
 
+local F = far.Flags
+local DN_INITDIALOG	= F.DN_INITDIALOG
+local DM_GETDIALOGINFO	= F.DM_GETDIALOGINFO
+local DM_GETTEXT	= F.DM_GETTEXT
+local DE_DLGPROCINIT	= F.DE_DLGPROCINIT
+local DM_GETDLGRECT	= F.DM_GETDLGRECT
+local DM_RESIZEDIALOG	= F.DM_RESIZEDIALOG
+local DM_MOVEDIALOG	= F.DM_MOVEDIALOG
+local DM_SETITEMPOSITION= F.DM_SETITEMPOSITION
+local DM_GETITEMPOSITION= F.DM_GETITEMPOSITION
+local DN_RESIZECONSOLE	= F.DN_RESIZECONSOLE
+local FRS_RECUR		= F.FRS_RECUR
+local DM_CLOSE		= F.DM_CLOSE
+
 -- Timer poll interval in milliseconds:
-local POLL_INTERVAL = 1000
-local POLL_INT_PNL_CHK = 3000
-local POLL_INT_TMP_CHK = 5000
-local POLL_INT_CLK_CHK = 10000
-local WRITE_LOG = false
-local UPD_TIME_VAR = false
-local CHK_TEMP_VAR = false
-local REDRAW_SHELL = false -- to update prompt clock
-local USE_TIMER =
-	true
-local CONT_COL_DIR_CALC_LIM = 5000
-local SYNC_STORE_LIMIT = 30000
-local SQL_OUT =
-	"NUL"
---	"c:\\sqlite.out"
+local POLL_INTERVAL	= 1000
+local POLL_INT_PNL_CHK	= 3000
+local POLL_INT_TMP_CHK	= 5000
+local POLL_INT_CLK_CHK	= 10000
+local WRITE_LOG		= false
+local UPD_TIME_VAR	= false
+local CHK_TEMP_VAR	= false
+local REDRAW_SHELL	= false -- to update prompt clock
+local USE_TIMER		= true
+local CONT_COL_DIR_CALC_LIM
+			= 5000
+local SYNC_STORE_LIMIT	= 30000
+local SQL_OUT		= "NUL"
+		--	= "c:\\sqlite.out"
+local API_ACT_PNL = 1
+local API_PAS_PNL = 0
+local MCR_ACT_PNL = 0
+local MCR_PAS_PNL = 1
 
 
+local CUSTOM_CHANGE_SCRIPT_PATH = sz_own_file..'.Cfg'
 local SQLITE = 'sqlite3.exe'
 local LOCALCONFIG_DB = '%FARLOCALPROFILE%\\LocalConfig.db'
 
@@ -42,8 +60,12 @@ LOCALCONFIG_DB = LOCALCONFIG_DB:gsub("%%(.-)%%", win.GetEnv)
 SQLITE = SQLITE:gsub("%%(.-)%%", win.GetEnv)
 
 if not	mf.fexist(SQLITE)
-then	local sqlite_path, sqlite_name = win.SearchPath(nil, SQLITE, ".exe")
-	if sqlite_path then SQLITE = sqlite_path end
+then	local	sqlite_path, 
+		sqlite_name 
+			= win.SearchPath(nil, SQLITE, ".exe")
+	if	sqlite_path 
+	then	SQLITE = sqlite_path 
+	end
 end
 
 local Curr_ActvLeft
@@ -103,21 +125,21 @@ COMMIT;]]
 	return exec_res, exec_msg
 end
 
-local function fnc_evt_dir_chg(evt_data)
---	LE(evt_data)
-	local was_change = false
-	local chg_str = ""
-	for key, val in pairs(evt_data) 
-	do	if	val
-		and	type(val) == "boolean" 
-		and	string.match(key, "^chg_") 
-		then	was_change = true
-			chg_str = chg_str..tostring(key).." = "..tostring(val).."\n"
+local fnc_custom_change_proc
+if mf.fexist(CUSTOM_CHANGE_SCRIPT_PATH) 
+then	local cust_fnc = loadfile(CUSTOM_CHANGE_SCRIPT_PATH)
+	if type(cust_fnc) == 'function' 
+	then	cust_fnc = cust_fnc()
+		if type(cust_fnc) == 'function' 
+		then fnc_custom_change_proc = cust_fnc
 		end
 	end
-	if was_change
-	then	far.Message(chg_str, "Something changed!")
-	else	far.Message("Nothing changed?!")
+end
+
+local function fnc_evt_dir_chg(evt_data)
+--	LE(evt_data)
+	if	fnc_custom_change_proc
+	then	fnc_custom_change_proc(evt_data)
 	end
 end
 
@@ -159,7 +181,7 @@ local function fnc_check_panel_state(force_save)
 		chg_phsp_R = chg_phsp_R, Prev_RghtPhsP = Prev_RghtPhsP,	Curr_RghtPhsP = Curr_RghtPhsP,
 		chg_item_L = chg_item_L, Prev_LeftItem = Prev_LeftItem,	Curr_LeftItem = Curr_LeftItem,
 		chg_item_R = chg_item_R, Prev_RghtItem = Prev_RghtItem,	Curr_RghtItem = Curr_RghtItem,
-			}
+	}
 
 	local chg_any =
 		chg_actv_P or
@@ -188,8 +210,9 @@ local function fnc_check_panel_state(force_save)
 	end
 
 	local cmt_res, cmt_msg
-	if 	force_save or
-		uncommitted > 0 and (dt_now - dt_chg > SYNC_STORE_LIMIT)
+	if 	force_save 
+	or	uncommitted > 0 
+	and 	dt_now - dt_chg > SYNC_STORE_LIMIT
 	then
 		uncommitted = 0
 		cmt_res, cmt_msg = fnc_save_panel_state(tbl_evt_data)
@@ -207,6 +230,16 @@ end
 
 
 -- #####
+
+local function fnc_redraw_panel_to_show_time_in_prompt(sender, ActPanCurPos, TopPanelItem)
+	local paninf = panel.GetPanelInfo(nil, 1)
+	local pos_to_set = math.min(ActPanCurPos, paninf.ItemsNumber)
+	if	paninf.CurrentItem == pos_to_set
+	then 	sender:Close()
+	else	panel.RedrawPanel(API_ACT_PNL, { CurrentItem = pos_to_set, TopPanelItem = TopPanelItem })
+	end
+end
+
 
 local function fnc_timer_poll(tmr_sender, force_check, force_save, who_sent)
 
@@ -226,8 +259,8 @@ then	dt_pnl_chk = dt_now
 end
 
 
-if	USE_TIMER 
-and	tmr_sender 
+if	USE_TIMER
+and	tmr_sender
 and not tmr_sender.Closed
 then	tmr_sender.Enabled = true
 end
@@ -238,19 +271,19 @@ return pnl_evt_dat
 
 end
 
-local panel_costs = {}
-local panel_plugin_costs = {}
+local panel_costs = { }
+local panel_plugin_costs = { }
 local last_cont_col_dir
 
 local function fnc_eat_evt(file_path, who_sent)
 	local	evt_dat = fnc_timer_poll(tmr_poll, true, false, who_sent)
-	local	chg_dir =
-		evt_dat.chg_path_L or
-		evt_dat.chg_path_R
+	local	chg_dir = 
+			evt_dat.chg_path_L or
+			evt_dat.chg_path_R
 	local	is_plugin, file_plugin_dir, path_dir
 	if 	file_path
 	then	path_dir = file_path:match("^(.+[\\/])"):match("^(.+)\\$")
-	else	path_dir =
+	else	path_dir = 
 			evt_dat.chg_path_L and evt_dat.Curr_LeftPath or
 			evt_dat.chg_path_R and evt_dat.Curr_RghtPath
 	end
@@ -266,35 +299,32 @@ local function fnc_eat_evt(file_path, who_sent)
 	end
 	local host_file_L_dir = is_plugin and L_Panel.Path0:find(file_plugin_dir, nil, "plain") == 1 and L_Panel.Path0 == file_plugin_dir and file_plugin_dir
 	local host_file_R_dir = is_plugin and R_Panel.Path0:find(file_plugin_dir, nil, "plain") == 1 and R_Panel.Path0 == file_plugin_dir and file_plugin_dir
-	if 	evt_dat.chg_path_L or
-		panel_cont_first_run
+	if evt_dat.chg_path_L or panel_cont_first_run
 	then	if	panel_costs[L_Panel.Path0]
 		then	panel_costs[L_Panel.Path0].dt_start = dt_now
 			panel_costs[L_Panel.Path0].items_cnt = 0
 			panel_costs[L_Panel.Path0].dt_said_cost = nil
-		else	panel_costs[L_Panel.Path0] = { cost = 0, items_cnt = 0, items_calc_cnt = 0, dt_start = dt_now, dt_created = dt_now, path_dir = L_Panel.Path0, host_file_dir = host_file_L_dir and true or false, is_left = true, who_sent = who_sent}
+		else	panel_costs[L_Panel.Path0] = { cost = 0, items_cnt = 0, items_calc_cnt = 0, dt_start = dt_now, dt_created = dt_now, path_dir = L_Panel.Path0, host_file_dir = host_file_L_dir and true or false, is_left = true, who_sent = who_sent }
 		end
 	end
-	if 	evt_dat.chg_path_R or
-		panel_cont_first_run
+	if evt_dat.chg_path_R or panel_cont_first_run
 	then	if	panel_costs[R_Panel.Path0]
 		then	panel_costs[R_Panel.Path0].dt_start = dt_now
 			panel_costs[R_Panel.Path0].items_cnt = 0
 			panel_costs[R_Panel.Path0].dt_said_cost = nil
-		else	panel_costs[R_Panel.Path0] = { cost = 0, items_cnt = 0, items_calc_cnt = 0, dt_start = dt_now, dt_created = dt_now, path_dir = R_Panel.Path0, host_file_dir = host_file_R_dir and true or false, is_left = false, who_sent = who_sent}
+		else	panel_costs[R_Panel.Path0] = { cost = 0, items_cnt = 0, items_calc_cnt = 0, dt_start = dt_now, dt_created = dt_now, path_dir = R_Panel.Path0, host_file_dir = host_file_R_dir and true or false, is_left = false, who_sent = who_sent }
 		end
 	end
 	if panel_cont_first_run then panel_cont_first_run = false end
 	if is_plugin then panel_costs[file_plugin_dir] = panel_costs[host_file_L_dir or host_file_R_dir] end
 	return path_dir
-end;
+end; 
 
 local ContCol_v2 =
-	{
+{
 -- ###
 GetContentFields = function(col_set, param2)
 	local new_dir = fnc_eat_evt(nil, "P_")
-	return true
 end;
 
 GetContentData = function(path_file, col_set)
@@ -302,18 +332,18 @@ GetContentData = function(path_file, col_set)
 	local	new_dir = string.match(path_file, ".?\\$") and true or false
 	local	path_fold = string.sub(string.match(path_file, "^(.+[\\/])"), 1, -2)
 	if	string.sub(path_file, 1, 4) == "\\\\?\\"
-	then
+	then	
 		path_fold = string.sub(path_fold, 5)
 	end
 	if	path_fold:sub(1, 4) == "UNC\\"
-	then
+	then	
 		path_fold = "\\"..path_fold:sub(4)
 	end
 	local is_root, path_root, unc_host
 	unc_host = string.match(path_fold, "^\\\\([^\\]+)")
 	path_root = unc_host and
 		string.match(path_fold, "^\\\\.-\\[^\\]+[^\\]") or
-		string.match(path_fold, "^[^\\]:")
+		string.match(path_fold, "^[^\\]:") 
 	is_root = path_root == path_fold
 	if	is_root
 	then	path_fold = path_fold.."\\"
@@ -324,7 +354,6 @@ GetContentData = function(path_file, col_set)
 	then	fnc_eat_evt(path_file, "C_")
 		last_cont_col_dir_chg = true
 		last_cont_col_dir = path_fold
-		
 		pan_cost = panel_costs[path_fold]
 	end
 	if	pan_cost.host_file_dir
@@ -333,35 +362,34 @@ GetContentData = function(path_file, col_set)
 	end
 	local	too_costy = pan_cost.cost > CONT_COL_DIR_CALC_LIM
 	local	dt_calc_start = Far.UpTime
-	local	the_col
-	for	ii, val in ipairs(col_set)
+	local	the_col, found_cnt
+
+	local function fnc_file_item_check(item)
+		found_cnt = found_cnt + 1
+		if not	string.match(item.FileAttributes, "d")
+		then	return true
+		elseif	found_cnt % 25 == 0 and Far.UpTime - dt_calc_start > CONT_COL_DIR_CALC_LIM
+		then 
+			return true, true
+		end
+	end
+
+	for ii, val in ipairs(col_set)
 	do	the_col = string.lower(val)
 		if	too_costy
 		then	col_dat[ii] = "."
 			if not	pan_cost.dt_said_cost
 			then	pan_cost.dt_said_cost = Far.UpTime
 			end
-		else	if	the_col == "i"
+		else	if	the_col == "i" 
 			then	local	f_attr = win.GetFileAttr(path_file)
 				if	f_attr
 				then	local	is_dir = string.find(f_attr, "d") and true or false
 					local 	is_lnk = string.find(f_attr, "e") and true or false
 					local 	is_arc = string.find(f_attr, "a") and true or false
 					if	is_dir and not is_lnk
-					then	local found_cnt = 0
-						local found_file, got_tmOt = far.RecursiveSearch(
-							path_file, '*.*', function(item)
--- ###
-found_cnt = found_cnt + 1
-if not	string.match(item.FileAttributes, "d")
-then	return true
-elseif	found_cnt % 25 == 0 and Far.UpTime - dt_calc_start > CONT_COL_DIR_CALC_LIM
-then
-	return true, true
-end
--- @@@
-								end, far.Flags.FRS_RECUR
-									)
+					then	found_cnt = 0
+						local found_file, got_tmOt = far.RecursiveSearch(path_file, '*.*', fnc_file_item_check, FRS_RECUR)
 						col_dat[ii] = got_tmOt and "." or found_file and "" or found_cnt > 0 and "e" or "E"
 					else 	local link_cnt = far.GetNumberOfLinks(path_file)
 						col_dat[ii] = link_cnt > 1 and tostring(link_cnt) or ""
@@ -390,17 +418,19 @@ end
 	return col_dat
 end;
 -- @@@ c0_v2
-	}
+}
 
-if not	Far
-then	for k, v in pairs(ContCol_v2) do export[k] = v; end
+if not Far
+then	for k, v in pairs(ContCol_v2) 
+	do export[k] = v
+	end
 elseif	ContentColumns
 then	ContentColumns(ContCol_v2)
 end
 
-local tmr_poll
-if USE_TIMER then
-	tmr_poll = far.Timer(POLL_INTERVAL, fnc_timer_poll, false, false, "T_")
+local	tmr_poll
+if	USE_TIMER 
+then	tmr_poll = far.Timer(POLL_INTERVAL, fnc_timer_poll, false, false, "T_")
 end
 
 local	FAR_EXIT_MSG_DLG_ID_TXT = "4EBBEFC8-2084-4B7F-94C0-692CE136894D"
@@ -410,8 +440,9 @@ Event { description = "FAR exit detection";
 	group = "DialogEvent";
 	action = function(evt, prm)
 -- ###
-if	prm.Msg == far.Flags.DN_INITDIALOG and evt == far.Flags.DE_DLGPROCINIT
-then	local	dlg_info = prm.hDlg:send(far.Flags.DM_GETDIALOGINFO)
+if	evt	== DE_DLGPROCINIT
+and	prm.Msg == DN_INITDIALOG 
+then	local	dlg_info = prm.hDlg:send(DM_GETDIALOGINFO)
 	if	dlg_info and win.Uuid(dlg_info.Id):upper() == FAR_EXIT_MSG_DLG_ID_TXT
 	then
 		fnc_timer_poll(tmr_poll, false, true, "E_")
@@ -425,9 +456,9 @@ Event { description = "PanelChangeDir: Clean up timer on exit";
 	group = "ExitFAR";
 	action = function()
 -- ###
-if	tmr_poll
-then	if	tmr_poll.Enabled	then tmr_poll.Enabled = false; end;
-	if not	tmr_poll.Closed		then tmr_poll:Close(); end;
+if tmr_poll
+then	if	tmr_poll.Enabled	then tmr_poll.Enabled = false;	end;
+	if not	tmr_poll.Closed		then tmr_poll:Close();		end;
 	tmr_poll = nil;
 end
 -- @@@
@@ -435,7 +466,8 @@ end
 }
 
 Macro { description = "detect panel change";
-	area = "Shell"; key = "Tab Enter CtrlU CtrlF1 CtrlF2 CtrlPgUp CtrlPgDn";
+	area = "Shell";
+	key = "Tab Enter CtrlU CtrlF1 CtrlF2 CtrlPgUp CtrlPgDn";
 	condition = function()
 -- ###
 if not (APanel.Visible or PPanel.Visible) then return end
@@ -446,3 +478,4 @@ return false;
 	action = function()
 	end
 }
+-- @@@@@
