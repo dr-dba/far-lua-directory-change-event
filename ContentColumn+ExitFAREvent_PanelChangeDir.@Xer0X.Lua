@@ -11,6 +11,9 @@
 based on the code of Gene.Pavlovsky:
 https://forum.farmanager.com/viewtopic.php?t=10521
 
+GitHub home:
+https://github.com/dr-dba/far-lua-directory-change-event
+
 Put the script here:
 %FARPROFILE%\Macros\scripts\ContentColumn+ExitFAREvent_PanelChangeDir.@Xer0X.Lua
 ]]
@@ -137,7 +140,6 @@ then	local cust_fnc = loadfile(CUSTOM_CHANGE_SCRIPT_PATH)
 end
 
 local function fnc_evt_dir_chg(evt_data)
---	LE(evt_data)
 	if	fnc_custom_change_proc
 	then	fnc_custom_change_proc(evt_data)
 	end
@@ -478,4 +480,5 @@ return false;
 	action = function()
 	end
 }
+
 -- @@@@@
