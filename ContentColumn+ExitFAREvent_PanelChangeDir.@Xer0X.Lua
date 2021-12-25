@@ -14,8 +14,15 @@ https://forum.farmanager.com/viewtopic.php?t=10521
 GitHub home:
 https://github.com/dr-dba/far-lua-directory-change-event
 
+FarForum discussion page:
+https://forum.farmanager.com/viewtopic.php?t=12437
+
 Put the script here:
 %FARPROFILE%\Macros\scripts\ContentColumn+ExitFAREvent_PanelChangeDir.@Xer0X.Lua
+
+You may use custom script for panel change events trackings:
+%FARPROFILE%\Macros\scripts\ContentColumn+ExitFAREvent_PanelChangeDir.@Xer0X.Lua.Cfg
+An example of custom script can be seen or taken from the GitHub page
 ]]
 
 local sz_own_file, sz_some_load_code = ...
