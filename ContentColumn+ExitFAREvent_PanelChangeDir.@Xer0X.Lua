@@ -27,6 +27,8 @@ An example of custom script can be seen or taken from the GitHub page
 
 local sz_own_file, sz_some_load_code = ...
 
+local Xer0X = Xer0X or require("Lib-Common-@Xer0X")
+
 local F = far.Flags
 local DN_INITDIALOG	= F.DN_INITDIALOG
 local DM_GETDIALOGINFO	= F.DM_GETDIALOGINFO
@@ -82,12 +84,14 @@ local WRITE_LOG		= false
 local UPD_TIME_VAR	= false
 local CHK_TEMP_VAR	= false
 local REDRAW_SHELL	= false -- to update prompt clock
+local STORE_PANEL_PATHS	= false
 local USE_TIMER		= true
 local CONT_COL_DIR_CALC_LIM
 			= 5000
 local SYNC_STORE_LIMIT	= 10000
-local SQL_OUTPUT	= "NUL"
-		--	= "c:\\sqlite.out"
+local SQLITE_OUTPUT	= 
+			"NUL"
+		--	"%TEMP%\\sqlite.out"
 local API_ACT_PNL = 1
 local API_PAS_PNL = 0
 local MCR_ACT_PNL = 0
@@ -95,13 +99,17 @@ local MCR_PAS_PNL = 1
 
 
 local CUSTOM_CHANGE_SCRIPT_PATH = sz_own_file..'.Cfg'
-local SQLITE_EXE_PATH= 'sqlite3.exe'
-local LOCALCONFIG_DB = '%FARLOCALPROFILE%\\LocalConfig.db'
+local SQLITE_EXE_PATH	= 'sqlite3.exe'
+local LOCALCONFIG_DB	= '%FARLOCALPROFILE%\\LocalConfig.db'
 
-LOCALCONFIG_DB = LOCALCONFIG_DB :gsub("%%(.-)%%", win_GetEnv)
-SQLITE_EXE_PATH= SQLITE_EXE_PATH:gsub("%%(.-)%%", win_GetEnv)
+LOCALCONFIG_DB	= LOCALCONFIG_DB :gsub("%%(.-)%%", win_GetEnv)
+SQLITE_EXE_PATH = SQLITE_EXE_PATH:gsub("%%(.-)%%", win_GetEnv)
+SQLITE_OUTPUT	= SQLITE_OUTPUT	: gsub("%%(.-)%%", win_GetEnv)
 
-if not	mf.fexist(SQLITE_EXE_PATH)
+local FAR_EXIT_MSG_DLG_ID_TXT = "4EBBEFC8-2084-4B7F-94C0-692CE136894D"
+local FAR_EXIT_MSG_DLG_ID_BIN = win_Uuid(FAR_EXIT_MSG_DLG_ID_TXT)
+
+if not mf.fexist(SQLITE_EXE_PATH)
 then	local	sqlite_path, 
 		sqlite_name 
 			= win.SearchPath(nil, SQLITE_EXE_PATH, ".exe")
@@ -161,7 +169,7 @@ COMMIT;]]       ):format(
 			R_Panel.Path0:gsub("'", "''"),
 			(pnl_evt_dat.Curr_ActvLeft and 1 or 0)
 		):gsub("[\r\n\t]+", " ")
-	local sql_cmd = ('""""%s" "%s" "%s" """ >> %s 2>&1'):format(SQLITE_EXE_PATH, LOCALCONFIG_DB, sqld, SQL_OUTPUT)
+	local sql_cmd = ('""""%s" "%s" "%s" """ >> %s 2>>&1'):format(SQLITE_EXE_PATH, LOCALCONFIG_DB, sqld, SQLITE_OUTPUT)
 	local exec_res, exec_msg = win_system(sql_cmd)
 	return exec_res, exec_msg
 end
@@ -247,10 +255,11 @@ local function fnc_check_panel_state(force_save)
 		end
 	end
 
-	local cmt_res, cmt_msg
-	if 	force_save 
-	or	uncommitted > 0 
-	and 	dt_now - dt_chg > SYNC_STORE_LIMIT
+	local	cmt_res, cmt_msg
+	if 	STORE_PANEL_PATHS
+	and (	force_save 
+	or 	uncommitted > 0 
+	and 	dt_now - dt_chg > SYNC_STORE_LIMIT)
 	then	uncommitted = 0
 		cmt_res, cmt_msg = fnc_save_panel_state(tbl_evt_data)
 	end
@@ -314,9 +323,7 @@ local last_cont_col_dir
 
 local function fnc_eat_evt(file_path, who_sent)
 	local	evt_dat = fnc_timer_poll(tmr_poll, true, false, who_sent)
-	local	chg_dir = 
-			evt_dat.chg_path_L or
-			evt_dat.chg_path_R
+	local	chg_dir = evt_dat.chg_dir
 	local	is_plugin, file_plugin_dir, path_dir
 	if 	file_path
 	then	path_dir = file_path:match("^(.+[\\/])"):match("^(.+)\\$")
@@ -357,25 +364,34 @@ local function fnc_eat_evt(file_path, who_sent)
 	return path_dir
 end; 
 
+local found_file, timed_out, found_cnt
+local function fnc_file_item_check(item, dt_col_calc_start)
+	found_cnt = found_cnt + 1
+	if not	string_match(item.FileAttributes, "d")
+	then	return true, false -- found a file
+	elseif	found_cnt % 10 == 0 and Far.UpTime - dt_col_calc_start > CONT_COL_DIR_CALC_LIM
+	then    -- timeouted lookinf in the directory
+		return true, true
+	end
+end
+
 local ContCol_v2 =
 {
 -- ###
 GetContentFields = function(col_set, param2)
 	local new_dir = fnc_eat_evt(nil, "P_")
 	return true
-end;
+end,
 
 GetContentData = function(path_file, col_set)
 	local	col_dat = { }
 	local	new_dir = string_match(path_file, ".?\\$") and true or false
 	local	path_fold = string_sub(string_match(path_file, "^(.+[\\/])"), 1, -2)
 	if	string_sub(path_file, 1, 4) == "\\\\?\\"
-	then	
-		path_fold = string_sub(path_fold, 5)
+	then	path_fold = string_sub(path_fold, 5)
 	end
 	if	path_fold:sub(1, 4) == "UNC\\"
-	then	
-		path_fold = "\\"..path_fold:sub(4)
+	then	path_fold = "\\"..path_fold:sub(4)
 	end
 	local is_root, path_root, unc_host
 	unc_host = string_match(path_fold, "^\\\\([^\\]+)")
@@ -395,40 +411,32 @@ GetContentData = function(path_file, col_set)
 		pan_cost = panel_costs[path_fold]
 	end
 	if	pan_cost.host_file_dir
-	then
-		return
+	then	return
 	end
-	local	too_costy = pan_cost.cost > CONT_COL_DIR_CALC_LIM
-	local	dt_calc_start = Far.UpTime
-	local	the_col, found_cnt
-
-	local function fnc_file_item_check(item)
-		found_cnt = found_cnt + 1
-		if not	string_match(item.FileAttributes, "d")
-		then	return true, false -- found a file
-		elseif	found_cnt % 10 == 0 and Far.UpTime - dt_calc_start > CONT_COL_DIR_CALC_LIM
-		then    -- timeouted lookinf in the directory
-			return true, true
-		end
-	end
-
+	local	is_too_costy_dir_scan = pan_cost.cost > CONT_COL_DIR_CALC_LIM
+	local	dt_col_calc_start = Far.UpTime
 	for ii, ii_val in ipairs(col_set)
-	do	the_col = string_lower(ii_val)
-		if	too_costy
-		then	col_dat[ii] = "."
-			if not	pan_cost.dt_said_cost
-			then	pan_cost.dt_said_cost = Far.UpTime
-			end
-		else	if	the_col == "i" 
-			then	local	f_attr = win_GetFileAttr(path_file)
+	do	
+		local	the_col = string_lower(ii_val)
+		if	the_col == "i"
+		then	
+			if	is_too_costy_dir_scan
+			then	
+				col_dat[ii] = "."
+				if not	pan_cost.dt_said_cost
+				then	pan_cost.dt_said_cost = Far.UpTime
+				end
+			else	
+				local	f_attr = win_GetFileAttr(path_file)
 				if	f_attr
-				then	local	is_dir = string_find(f_attr, "d") and true or false
+				then	
+					local	is_dir = string_find(f_attr, "d") and true or false
 					local 	is_lnk = string_find(f_attr, "e") and true or false
 					local 	is_arc = string_find(f_attr, "a") and true or false
 					if	is_dir and not is_lnk
 					then	found_cnt = 0
-						local found_file, got_tmOt, xyz1 = far_RecursiveSearch(path_file, '*.*', fnc_file_item_check, FRS_RECUR)
-						col_dat[ii] = got_tmOt and "T" or found_file and "" or found_cnt > 0 and "e" or "E"
+						found_file, timed_out = far_RecursiveSearch(path_file, '*.*', fnc_file_item_check, FRS_RECUR, dt_col_calc_start)
+						col_dat[ii] = timed_out and "T" or found_file and "" or found_cnt > 0 and "e" or "E"
 					else 	local link_cnt = far_GetNumberOfLinks(path_file)
 						col_dat[ii] = link_cnt > 1 and tostring(link_cnt) or ""
 					end
@@ -436,23 +444,29 @@ GetContentData = function(path_file, col_set)
 					or	col_dat[ii] == ""
 						then	if	is_lnk
 							then	col_dat[ii] = ">"
-							elseif 	is_arc and not is_dir
+							elseif 	is_arc 
+							and not is_dir
 							then	col_dat[ii] = "a"
 							end
 					end
+				else
+					col_dat[ii] = "?"
 				end
-			elseif 	the_col == "i2"
-			then
-			elseif	the_col == "x"
-			then
+				pan_cost.items_calc_cnt = pan_cost.items_calc_cnt + 1
+				pan_cost.dt_calc = Far.UpTime
 			end
-			pan_cost.items_calc_cnt = pan_cost.items_calc_cnt + 1
-			pan_cost.dt_calc = Far.UpTime
+		elseif 	
+			the_col == "i2"
+		then	
+			-- probably we should use it as a status column...
 		end
 	end
+	-- just to count panel items:
 	pan_cost.items_cnt = pan_cost.items_cnt + 1
-	pan_cost.cost = pan_cost.cost + (Far.UpTime - dt_calc_start)
-	pan_cost.dt_walk = Far.UpTime
+	-- last a single one item visited:
+	pan_cost.dt_walk = Far.UpTime 
+	-- add up the single item cost to total cost:
+	pan_cost.cost = pan_cost.cost + (pan_cost.dt_walk - dt_col_calc_start) 
 	return col_dat
 end;
 -- @@@ c0_v2
@@ -471,9 +485,6 @@ if	USE_TIMER
 then	tmr_poll = far_Timer(POLL_INTERVAL, fnc_timer_poll, false, false, "T_")
 end
 
-local	FAR_EXIT_MSG_DLG_ID_TXT = "4EBBEFC8-2084-4B7F-94C0-692CE136894D"
-local	FAR_EXIT_MSG_DLG_ID_BIN = win_Uuid(FAR_EXIT_MSG_DLG_ID_TXT)
-
 Event { description = "FAR exit detection";
 	group = "DialogEvent";
 	action = function(evt, prm)
@@ -482,8 +493,7 @@ if	evt	== DE_DLGPROCINIT
 and	prm.Msg == DN_INITDIALOG 
 then	local	dlg_info = prm.hDlg:send(DM_GETDIALOGINFO)
 	if	dlg_info and win_Uuid(dlg_info.Id):upper() == FAR_EXIT_MSG_DLG_ID_TXT
-	then
-		fnc_timer_poll(tmr_poll, false, true, "E_")
+	then	fnc_timer_poll(tmr_poll, false, true, "E_")
 	end
 end
 -- @@@
