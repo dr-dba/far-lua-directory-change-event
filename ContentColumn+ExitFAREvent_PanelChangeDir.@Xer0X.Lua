@@ -84,7 +84,7 @@ local WRITE_LOG		= false
 local UPD_TIME_VAR	= false
 local CHK_TEMP_VAR	= false
 local REDRAW_SHELL	= false -- to update prompt clock
-local STORE_PANEL_PATHS	= false
+local STORE_PANEL_PATHS	= true
 local USE_TIMER		= true
 local CONT_COL_DIR_CALC_LIM
 			= 5000
@@ -97,6 +97,8 @@ local API_PAS_PNL = 0
 local MCR_ACT_PNL = 0
 local MCR_PAS_PNL = 1
 
+local FAR_EXIT_MSG_DLG_ID_TXT = "4EBBEFC8-2084-4B7F-94C0-692CE136894D"
+local FAR_EXIT_MSG_DLG_ID_BIN = win_Uuid(FAR_EXIT_MSG_DLG_ID_TXT)
 
 local CUSTOM_CHANGE_SCRIPT_PATH = sz_own_file..'.Cfg'
 local SQLITE_EXE_PATH	= 'sqlite3.exe'
@@ -105,9 +107,6 @@ local LOCALCONFIG_DB	= '%FARLOCALPROFILE%\\LocalConfig.db'
 LOCALCONFIG_DB	= LOCALCONFIG_DB :gsub("%%(.-)%%", win_GetEnv)
 SQLITE_EXE_PATH = SQLITE_EXE_PATH:gsub("%%(.-)%%", win_GetEnv)
 SQLITE_OUTPUT	= SQLITE_OUTPUT	: gsub("%%(.-)%%", win_GetEnv)
-
-local FAR_EXIT_MSG_DLG_ID_TXT = "4EBBEFC8-2084-4B7F-94C0-692CE136894D"
-local FAR_EXIT_MSG_DLG_ID_BIN = win_Uuid(FAR_EXIT_MSG_DLG_ID_TXT)
 
 if not mf.fexist(SQLITE_EXE_PATH)
 then	local	sqlite_path, 
@@ -163,11 +162,9 @@ INSERT INTO 'general_config' VALUES('Panel.Right', 'CurFile'	, '%s');
 INSERT INTO 'general_config' VALUES('Panel.Right', 'Folder'	, '%s');
 INSERT INTO 'general_config' VALUES('Panel'	 , 'LeftFocus'	,  %s );
 COMMIT;]]       ):format(
-			pnl_evt_dat.Curr_LeftItem:gsub("'", "''"),
-			L_Panel.Path0:gsub("'", "''"),
-			pnl_evt_dat.Curr_RghtItem:gsub("'", "''"),
-			R_Panel.Path0:gsub("'", "''"),
-			(pnl_evt_dat.Curr_ActvLeft and 1 or 0)
+			pnl_evt_dat.Curr_LeftItem:gsub("'", "''"), L_Panel.Path0:gsub("'", "''"),
+			pnl_evt_dat.Curr_RghtItem:gsub("'", "''"), R_Panel.Path0:gsub("'", "''"),
+			pnl_evt_dat.Curr_ActvLeft and 1 or 0
 		):gsub("[\r\n\t]+", " ")
 	local sql_cmd = ('""""%s" "%s" "%s" """ >> %s 2>>&1'):format(SQLITE_EXE_PATH, LOCALCONFIG_DB, sqld, SQLITE_OUTPUT)
 	local exec_res, exec_msg = win_system(sql_cmd)
@@ -388,10 +385,12 @@ GetContentData = function(path_file, col_set)
 	local	new_dir = string_match(path_file, ".?\\$") and true or false
 	local	path_fold = string_sub(string_match(path_file, "^(.+[\\/])"), 1, -2)
 	if	string_sub(path_file, 1, 4) == "\\\\?\\"
-	then	path_fold = string_sub(path_fold, 5)
+	then	
+		path_fold = string_sub(path_fold, 5)
 	end
 	if	path_fold:sub(1, 4) == "UNC\\"
-	then	path_fold = "\\"..path_fold:sub(4)
+	then	
+		path_fold = "\\"..path_fold:sub(4)
 	end
 	local is_root, path_root, unc_host
 	unc_host = string_match(path_fold, "^\\\\([^\\]+)")
@@ -411,7 +410,8 @@ GetContentData = function(path_file, col_set)
 		pan_cost = panel_costs[path_fold]
 	end
 	if	pan_cost.host_file_dir
-	then	return
+	then
+		return
 	end
 	local	is_too_costy_dir_scan = pan_cost.cost > CONT_COL_DIR_CALC_LIM
 	local	dt_col_calc_start = Far.UpTime
@@ -493,7 +493,8 @@ if	evt	== DE_DLGPROCINIT
 and	prm.Msg == DN_INITDIALOG 
 then	local	dlg_info = prm.hDlg:send(DM_GETDIALOGINFO)
 	if	dlg_info and win_Uuid(dlg_info.Id):upper() == FAR_EXIT_MSG_DLG_ID_TXT
-	then	fnc_timer_poll(tmr_poll, false, true, "E_")
+	then
+		fnc_timer_poll(tmr_poll, false, true, "E_")
 	end
 end
 -- @@@
@@ -523,7 +524,7 @@ far_Timer(5, function(sender) sender.Enabled = false; sender:Close(); fnc_eat_ev
 return false;
 -- @@@
 	end;
-	action = function()
-	end
+	action = function() end
 }
+
 -- @@@@@
