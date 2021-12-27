@@ -10,9 +10,14 @@ https://forum.farmanager.com/viewtopic.php?t=10521
 FarForum discussion page:<br />
 https://forum.farmanager.com/viewtopic.php?t=12437
 <br /><br />
+DEPENDS ON THE LUA MODULE:<br />
+https://github.com/dr-dba/far-lua-general-utils<br />
+Put the Lua module here:<br />
+%FARPROFILE%\Macros\modules\Lib-Common-@Xer0X.Lua
+<br /><br />
 GitHub home:<br />
 https://github.com/dr-dba/far-lua-directory-change-event
-<br /><br />
+<br />
 Put the script here:<br />
 %FARPROFILE%\Macros\scripts\ContentColumn+ExitFAREvent_PanelChangeDir.@Xer0X.Lua
 <br /><br />
