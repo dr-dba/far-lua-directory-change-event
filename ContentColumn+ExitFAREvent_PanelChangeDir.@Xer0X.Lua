@@ -16,9 +16,13 @@ https://forum.farmanager.com/viewtopic.php?t=12437
 
 GitHub home:
 https://github.com/dr-dba/far-lua-directory-change-event
-
 Put the script here:
 %FARPROFILE%\Macros\scripts\ContentColumn+ExitFAREvent_PanelChangeDir.@Xer0X.Lua
+
+DEPENDS ON THE LUA MODULE:
+https://github.com/dr-dba/far-lua-general-utils
+Put the Lua module here:
+%FARPROFILE%\Macros\modules\Lib-Common-@Xer0X.Lua
 
 You may use custom script for panel change events trackings:
 %FARPROFILE%\Macros\scripts\ContentColumn+ExitFAREvent_PanelChangeDir.@Xer0X.Lua.Cfg
