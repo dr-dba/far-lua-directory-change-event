@@ -151,7 +151,6 @@ local uncommitted = 0
 local L_Panel
 local R_Panel
 
-
 local function fnc_save_panel_state(pnl_evt_dat)
 	local sqld = ([[
 BEGIN TRANSACTION;
@@ -271,7 +270,6 @@ local function fnc_prep_for_now()
 		os_date("%Y-%m-%d %H:%M:%S")
 end
 
-
 -- #####
 
 local function fnc_redraw_panel_to_show_time_in_prompt(sender, ActPanCurPos, TopPanelItem)
@@ -300,7 +298,6 @@ then	dt_pnl_chk = dt_now
 	itm_ch, dir_ch, saved, pnl_evt_dat = fnc_check_panel_state(force_save)
 	act_done = act_done..(saved and (itm_ch or dir_ch) and "$" or saved and "S" or (itm_ch or dir_ch) and "C" or "c")
 end
-
 
 if	USE_TIMER
 and	tmr_sender
@@ -367,7 +364,7 @@ local function fnc_file_item_check(item, dt_col_calc_start)
 	if not	string_match(item.FileAttributes, "d")
 	then	return true, false -- found a file
 	elseif	found_cnt % 10 == 0 and Far.UpTime - dt_col_calc_start > CONT_COL_DIR_CALC_LIM
-	then    -- timeouted lookinf in the directory
+	then    -- timeouted looking in the directory
 		return true, true
 	end
 end
@@ -385,12 +382,10 @@ GetContentData = function(path_file, col_set)
 	local	new_dir = string_match(path_file, ".?\\$") and true or false
 	local	path_fold = string_sub(string_match(path_file, "^(.+[\\/])"), 1, -2)
 	if	string_sub(path_file, 1, 4) == "\\\\?\\"
-	then	
-		path_fold = string_sub(path_fold, 5)
+	then	path_fold = string_sub(path_fold, 5)
 	end
 	if	path_fold:sub(1, 4) == "UNC\\"
-	then	
-		path_fold = "\\"..path_fold:sub(4)
+	then	path_fold = "\\"..path_fold:sub(4)
 	end
 	local is_root, path_root, unc_host
 	unc_host = string_match(path_fold, "^\\\\([^\\]+)")
@@ -410,8 +405,7 @@ GetContentData = function(path_file, col_set)
 		pan_cost = panel_costs[path_fold]
 	end
 	if	pan_cost.host_file_dir
-	then
-		return
+	then	return
 	end
 	local	is_too_costy_dir_scan = pan_cost.cost > CONT_COL_DIR_CALC_LIM
 	local	dt_col_calc_start = Far.UpTime
