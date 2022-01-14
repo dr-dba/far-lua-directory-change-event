@@ -82,8 +82,6 @@ local math_min		= math.min
 local math_max		= math.max
 
 local fnc_str_replace   = Xer0X.fnc_str_replace
-local fnc_set_tmp_dir_var
-			= Xer0X.fnc_set_tmp_dir_var
 local fnc_file_append	= Xer0X.fnc_file_append
 local fnc_trans_msg	= Xer0X.fnc_trans_msg
 
@@ -92,15 +90,6 @@ local POLL_INTERVAL	= 1000
 local POLL_INT_PNL_CHK	= 3000
 local POLL_INT_TMP_CHK	= 5000
 local POLL_INT_CLK_CHK	= 10000
-
-local TMP_DIR_MUST	= fnc_set_tmp_dir_var("temp") 
-local WRITE_LOG		= true
-
-local LOG_LINE_FMT	= "%s "..Far.PID.." %-8s %4s %s\n"
-local LOG_FILE_LOC	= TMP_DIR_MUST..("\\check_env_%s.txt"):format(os_date("%Y-%m-%d %H:%M:%S"):gsub("[.]", ""):sub(1, 10))
-
-local UPD_TIME_VAR	= false
-local CHK_TEMP_VAR	= false
 local REDRAW_SHELL	= false -- to update prompt clock
 local STORE_PANEL_PATHS	= true
 local USE_TIMER		= true
@@ -278,6 +267,8 @@ local function fnc_check_panel_state(force_save)
 
 	return	chg_any, chg_dir, cmt_res == 0, tbl_evt_data
 end -- of fnc_check_panel_state
+
+
 
 local function fnc_timer_poll(tmr_sender, force_check, force_save, who_sent)
 
