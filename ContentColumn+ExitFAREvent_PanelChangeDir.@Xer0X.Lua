@@ -166,6 +166,7 @@ local L_Panel
 local R_Panel
 local tmr_poll, last_cont_col_dir
 
+
 local function fnc_save_panel_state(pnl_evt_dat)
 	local sqld = ([[
 BEGIN TRANSACTION;
@@ -277,18 +278,6 @@ local function fnc_check_panel_state(force_save)
 
 	return	chg_any, chg_dir, cmt_res == 0, tbl_evt_data
 end -- of fnc_check_panel_state
-
--- #####
-
-local function fnc_redraw_panel_to_show_time_in_prompt(sender, ActPanCurPos, TopPanelItem)
-	local paninf = panel_GetPanelInfo(nil, 1)
-	local pos_to_set = math_min(ActPanCurPos, paninf.ItemsNumber)
-	if	paninf.CurrentItem == pos_to_set
-	then 	sender:Close()
-	else	panel_RedrawPanel(API_ACT_PNL, { CurrentItem = pos_to_set, TopPanelItem = TopPanelItem })
-	end
-end
-
 
 local function fnc_timer_poll(tmr_sender, force_check, force_save, who_sent)
 
@@ -423,7 +412,8 @@ GetContentData = function(path_file, col_set)
 		pan_cost = panel_costs[path_fold]
 	end
 	if	pan_cost.host_file_dir
-	then	return
+	then
+		return
 	end
 	local	is_too_costy_dir_scan = pan_cost.cost > CONT_COL_DIR_CALC_LIM
 	local	dt_col_calc_start = Far.UpTime
@@ -541,5 +531,4 @@ return false;
 	action = function()
 	end
 }
-
 -- @@@@@
