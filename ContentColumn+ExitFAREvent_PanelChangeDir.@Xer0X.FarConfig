@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<farconfig version="3.0.5920">
+	<generalconfig>
+		<setting key="Cmdline" name="PromptFormat" type="text" value="$#60(b)%panel_host_file%(a)%panel_prefix%(0:8)$m()$P|(e:1)$T$H$H$H"/>
+		<setting key="Cmdline" name="UsePromptFormat" type="qword" value="0000000000000001"/>
+        	<setting key="Panel.Left"	name="ViewMode" type="qword" value="0000000000000004"/>
+        	<setting key="Panel.Right"	name="ViewMode" type="qword" value="0000000000000004"/>
+        	<setting key="PanelChange"	name="EventSet" type="qword" value="0000000000000001"/>
+	</generalconfig>
+	<panelmodes>
+		<hierarchicalconfig>
+			<key name="4">
+				<value name="ColumnTitles" type="text" value="&lt;xcc-w1&gt;,NMD,S"/>
+				<value name="ColumnWidths" type="text" value="1,0,6"/>
+				<value name="StatusColumnTitles" type="text" value="&lt;xcc-s-w1&gt;,NMDR,DEB,F,S"/>
+				<value name="StatusColumnWidths" type="text" value="1,0,0,1,5"/>
+			</key>
+		</hierarchicalconfig>
+	</panelmodes>
+</farconfig>
